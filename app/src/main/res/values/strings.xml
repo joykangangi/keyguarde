@@ -91,4 +91,15 @@
         <item quantity="one">%1$d keyword matched</item>
         <item quantity="other">%1$d keywords matched</item>
     </plurals>
+
+    <!-- Home Header -->
+    <string name="selected_count">Selected Count</string>
+    <string name="recent_matches">Recent Matches</string>
+    <string name="exit_selection">Close</string>
+    <string name="select_matches">Select Matches</string>
+    <string name="clear_all_matches">Clear All Matches</string>
+    <string name="select_visible">Select</string>
+    <string name="clear">Clear Selection</string>
+    <string name="delete">Delete</string>
+
 </resources>

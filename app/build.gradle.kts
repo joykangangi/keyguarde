@@ -131,6 +131,9 @@ dependencies {
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlin.serialization)
 
+    //ML-TEXT-MATCHER
+    implementation(libs.mediapipe.ml.text)
+
     // Napier
     implementation(libs.napier)
 

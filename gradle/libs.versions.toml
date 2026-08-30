@@ -5,6 +5,7 @@ firebase = "34.6.0"
 kotlin = "2.2.21"
 paging = "3.3.6"
 room = "2.8.4"
+ml-media-pipe-text = "0.20230731"
 
 [libraries]
 # Android
@@ -41,6 +42,8 @@ junit = "junit:junit:4.13.2"
 kotlin-immutable = "org.jetbrains.kotlinx:kotlinx-collections-immutable:0.4.0"
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 kotlin-serialization = "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
+#ML
+mediapipe-ml-text = { group = "com.google.mediapipe", name = "tasks-text", version.ref = "ml-media-pipe-text" }
 # Napier
 napier = "io.github.aakira:napier:2.7.1"
 # Paging

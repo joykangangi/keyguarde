@@ -41,6 +41,8 @@ class AppListenerService : NotificationListenerService() {
 
     private var componentName: ComponentName? = null
 
+    private val aiSemanticMatcher by lazy { AISemanticMatcher(this) }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Napier.i { "Listener start command received" }
 
@@ -136,6 +138,8 @@ class AppListenerService : NotificationListenerService() {
                 keywords = words.map { (word) ->
                     word to "\\b${Regex.escape(word)}\\b".toRegex(RegexOption.IGNORE_CASE)
                 }
+                val updatedWords = words.map { it.word }
+                aiSemanticMatcher.syncCache(updatedWords)
             }
         }
 
@@ -149,6 +153,10 @@ class AppListenerService : NotificationListenerService() {
             settings.usePersistentSilentNotification.collectLatest {
                 usePersistentSilentNotification = it
             }
+        }
+
+        scope.launch {
+            aiSemanticMatcher.setupTextEmbedder()
         }
     }
 
@@ -197,7 +205,6 @@ class AppListenerService : NotificationListenerService() {
             pattern.containsMatchIn(text)
         }.map { it.first }.toSet()
 
-        if (matchedKeywords.isEmpty()) return
 
         // Get app name for better display
         val appName = try {
@@ -213,10 +220,18 @@ class AppListenerService : NotificationListenerService() {
         }
 
         scope.launch {
+            val similarKeywords = aiSemanticMatcher.findSimilarWords(
+                userKeywords = keywords.map { it.first },
+                incomingText = text
+            )
+            val allMatched = matchedKeywords + similarKeywords
+
+            if (allMatched.isEmpty()) return@launch
+
             // save matches to db
             val result = repository.addKeywordMatch(
                 KeywordMatch(
-                    keywords = matchedKeywords,
+                    keywords = allMatched,
                     app = notification.packageName,
                     chat = title,
                     message = text,
@@ -248,7 +263,7 @@ class AppListenerService : NotificationListenerService() {
             if (showHeadsUpNotifications) {
                 NotificationHelper.showKeywordMatchNotification(
                     context = this@AppListenerService,
-                    keywords = matchedKeywords,
+                    keywords = allMatched,
                     sourceName = title.ifBlank { appName },
                     showHeadsUp = true
                 )
@@ -285,5 +300,10 @@ class AppListenerService : NotificationListenerService() {
         private val _notificationIntents = MutableStateFlow(emptyMap<Long, PendingIntent>())
         val notificationIntents: StateFlow<Map<Long, PendingIntent>>
             get() = _notificationIntents
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        aiSemanticMatcher.clearTextEmbedder()
     }
 }
