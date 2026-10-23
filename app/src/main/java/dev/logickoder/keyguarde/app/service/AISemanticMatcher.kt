@@ -3,6 +3,7 @@ package dev.logickoder.keyguarde.app.service
 import android.content.Context
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.text.textembedder.TextEmbedder
+import io.github.aakira.napier.Napier
 import kotlin.collections.forEach
 import kotlin.math.sqrt
 
@@ -14,12 +15,20 @@ class AISemanticMatcher(
     private val keywordEmbeddingCache = mutableMapOf<String, FloatArray>()
 
     fun setupTextEmbedder() {
-        val baseOptionsBuilder = BaseOptions.builder()
-        val baseOption =
-            baseOptionsBuilder.setModelAssetPath("universal_sentence_encoder.tflite").build()
-        val options = TextEmbedder.TextEmbedderOptions.builder().setBaseOptions(baseOption).build()
-
-        textEmbedder = TextEmbedder.createFromOptions(context, options)
+        try {
+            val baseOptions = BaseOptions.builder()
+                .setModelAssetPath("universal_sentence_encoder.tflite")
+                .build()
+            val options = TextEmbedder.TextEmbedderOptions.builder()
+                .setBaseOptions(baseOptions)
+                .build()
+            textEmbedder = TextEmbedder.createFromOptions(context, options)
+            Napier.i { "AISemanticMatcher: model loaded successfully" }
+        } catch (e: IllegalStateException) {
+            Napier.e { "AISemanticMatcher: failed to load model — ${e.message}" }
+        } catch (e: RuntimeException) {
+            Napier.e { "AISemanticMatcher: runtime error — ${e.message}" }
+        }
     }
 
    private fun embedText(word: String): FloatArray? {

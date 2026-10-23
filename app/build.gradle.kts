@@ -164,4 +164,7 @@ dependencies {
     // WorkManager: pulled in by ads at 2.7.0 with Room 2.2.5, whose keep rules
     // let R8 strip WorkDatabase_Impl's constructor. Pin a current version.
     implementation(libs.work.runtime)
+
+    //ML-TEXT-MATCHER
+    implementation(libs.mediapipe.ml.text)
 }

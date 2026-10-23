@@ -7,6 +7,7 @@ lifecycle = "2.11.0"
 navigation3 = "1.2.0"
 paging = "3.5.2"
 room3 = "3.0.3"
+ml-media-pipe-text = "1.1.1"
 
 [libraries]
 # Android
@@ -67,6 +68,9 @@ room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3"
 room3-paging = { module = "androidx.room3:room3-paging", version.ref = "room3" }
 # SQLite
 sqlite-bundled = "androidx.sqlite:sqlite-bundled:2.7.1"
+
+#ML
+mediapipe-ml-text = { group = "com.google.mediapipe", name = "tasks-text", version.ref = "ml-media-pipe-text" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

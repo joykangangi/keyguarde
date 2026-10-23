@@ -48,6 +48,8 @@ class AppListenerService : NotificationListenerService() {
 
     private var componentName: ComponentName? = null
 
+    private val aiSemanticMatcher by lazy { AISemanticMatcher(this) }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Napier.i { "Listener start command received" }
 
@@ -68,6 +70,9 @@ class AppListenerService : NotificationListenerService() {
         Napier.i { "Listener created" }
         NotificationHelper.createNotificationChannels(this)
         loadSettings()
+        scope.launch {
+            aiSemanticMatcher.setupTextEmbedder()
+        }
     }
 
     override fun onListenerConnected() {
@@ -81,7 +86,9 @@ class AppListenerService : NotificationListenerService() {
         // (not saved) and cleared so it doesn't linger in the shade.
         if (sbn.packageName == packageName) {
             if (sbn.notification.extras.getBoolean(NotificationHelper.EXTRA_SETUP_TEST)) {
-                val text = sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+                val text =
+                    sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+                        .orEmpty()
                 _setupTestReceived.tryEmit(text)
                 cancelNotification(sbn.key)
             }
@@ -153,7 +160,9 @@ class AppListenerService : NotificationListenerService() {
         scope.launch {
             repository.keywords.collectLatest { words ->
                 // One pattern per word, so a match can report which keywords it caught.
-                keywords = words.mapNotNull { (word) -> keywordRegex(listOf(word))?.let { word to it } }
+                keywords =
+                    words.mapNotNull { (word) -> keywordRegex(listOf(word))?.let { word to it } }
+                aiSemanticMatcher.syncCache(currentKeywords = words.map { it.word })
             }
         }
 
@@ -228,26 +237,30 @@ class AppListenerService : NotificationListenerService() {
             pattern.containsMatchIn(text)
         }.map { it.first }.toSet()
 
-        if (matchedKeywords.isEmpty()) return
-
-        // Get app name for better display
-        val appName = try {
-            packageManager.getApplicationLabel(
-                packageManager.getApplicationInfo(
-                    notification.packageName,
-                    0
-                )
-            )
-                .toString()
-        } catch (_: Exception) {
-            notification.packageName
-        }
-
         scope.launch {
+            val semanticKeywords = if (matchedKeywords.isEmpty()) {
+                aiSemanticMatcher.findSimilarWords(
+                    userKeywords = keywords.map { it.first },
+                    incomingText = text
+                ).toSet()
+            } else emptySet()
+
+            val allMatched = matchedKeywords + semanticKeywords
+            if (allMatched.isEmpty()) return@launch
+
+            // Get app name for better display
+            val appName = try {
+                packageManager.getApplicationLabel(
+                    packageManager.getApplicationInfo(notification.packageName, 0)
+                ).toString()
+            } catch (_: Exception) {
+                notification.packageName
+            }
+
             // save matches to db
             val result = repository.addKeywordMatch(
                 KeywordMatch(
-                    keywords = matchedKeywords,
+                    keywords = allMatched,
                     app = notification.packageName,
                     chat = title,
                     message = text,
@@ -275,7 +288,7 @@ class AppListenerService : NotificationListenerService() {
             if (showHeadsUpNotifications) {
                 NotificationHelper.showKeywordMatchNotification(
                     context = this@AppListenerService,
-                    keywords = matchedKeywords,
+                    keywords = allMatched,
                     sourceName = title.ifBlank { appName },
                     showHeadsUp = true
                 )
@@ -291,7 +304,12 @@ class AppListenerService : NotificationListenerService() {
         withContext(Dispatchers.IO) {
             try {
                 icon.loadDrawable(this@AppListenerService)?.let { drawable ->
-                    saveChatAvatar(this@AppListenerService, notification.packageName, chat, drawable)
+                    saveChatAvatar(
+                        this@AppListenerService,
+                        notification.packageName,
+                        chat,
+                        drawable
+                    )
                 }
             } catch (e: Exception) {
                 Napier.w(e) { "Could not cache chat avatar" }
@@ -321,10 +339,16 @@ class AppListenerService : NotificationListenerService() {
          */
         val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        aiSemanticMatcher.clearTextEmbedder()
+    }
 }
 
 // Title clean-up, compiled once instead of on every notification.
-private val WhatsAppMessageCount = Regex("\\s*\\(\\d+\\s+(new\\s+)?messages?\\)", RegexOption.IGNORE_CASE)
+private val WhatsAppMessageCount =
+    Regex("\\s*\\(\\d+\\s+(new\\s+)?messages?\\)", RegexOption.IGNORE_CASE)
 private val TelegramMessageCount = Regex("\\s*\\(\\d+\\)")
 private val MessageCount = Regex("\\s*\\(\\d+\\s*(new\\s+)?messages?\\)", RegexOption.IGNORE_CASE)
 private val SenderPrefix = Regex("^[^:]+:\\s*")
